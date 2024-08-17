@@ -1,6 +1,18 @@
-nginx
+--platform linux/amd64 nginx
 #支持私库
-k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0
-xhofe/alist:latest
+# k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0
+# xhofe/alist:latest
 #支持指定架构
---platform=linux/arm64 xiaoyaliu/alist
+--platform linux/amd64 telegraf
+--platform linux/amd64 influxdb
+--platform linux/amd64 python
+--platform linux/amd64 python:3.12
+--platform linux/amd64 python:3.11
+--platform linux/amd64 python:3.10
+--platform linux/amd64 python:3.9
+--platform linux/amd64 python:3.8
+--platform linux/amd64 python:3.7
+--platform linux/amd64 enwaiax/x-ui:latest
+--platform linux/amd64 enwaiax/x-ui:alpha-zh
+--platform linux/amd64 enwaiax/x-ui:beta
+--platform linux/amd64 mzz2017/v2raya
