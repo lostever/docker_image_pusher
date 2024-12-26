@@ -16,4 +16,4 @@
 --platform linux/amd64 enwaiax/x-ui:alpha-zh
 --platform linux/amd64 enwaiax/x-ui:beta
 --platform linux/amd64 mzz2017/v2raya
---platform linux/amd64 rook/nfs
+--platform linux/amd64 dheaps/nfs-server-alpine
