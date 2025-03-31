@@ -18,3 +18,4 @@
 --platform linux/amd64 mzz2017/v2raya
 --platform linux/amd64 dheaps/nfs-server-alpine
 --platform linux/amd64 p3terx/yacd
+--platform linux/amd64 gzxhwq/sing-box
