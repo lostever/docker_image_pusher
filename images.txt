@@ -22,3 +22,4 @@
 --platform linux/amd64 gzxhwq/sing-box:client
 --platform linux/amd64 gzxhwq/sing-box:server
 --platform linux/amd64 gzxhwq/sing-box:dev
+--platform linux/amd64 alpine
