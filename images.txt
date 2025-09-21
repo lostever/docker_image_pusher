@@ -25,7 +25,7 @@
 --platform linux/amd64 alpine
 --platform linux/amd64 debian:testing
 --platform linux/amd64 debian:stable
---platform linux/amd64 ununtu:rolling
+--platform linux/amd64 ubuntu:rolling
 --platform linux/amd64 ubuntu:latest
 --platform linux/amd64 ubuntu:25.04
 --platform linux/amd64 ubuntu:24:04
