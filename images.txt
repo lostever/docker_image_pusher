@@ -49,7 +49,7 @@
 --platform linux/amd64 rabbitmq
 --platform linux/amd64 golang
 --platform linux/amd64 mariadb
---platform linux/amd64 centos
+--platform linux/amd64 rockylinux/rockylinux
 --platform linux/amd64 wordpress
 --platform linux/amd64 eclipse-mosquitto
 --platform linux/amd64 rust:slim
