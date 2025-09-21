@@ -54,3 +54,5 @@
 --platform linux/amd64 eclipse-mosquitto
 --platform linux/amd64 rust:slim
 --platform linux/amd64 rust:latest
+--platform linux/amd64 opensuse/leap
+--platform linux/amd64 leplusorg/kali
