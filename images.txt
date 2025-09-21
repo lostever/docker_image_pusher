@@ -28,7 +28,7 @@
 --platform linux/amd64 ubuntu:rolling
 --platform linux/amd64 ubuntu:latest
 --platform linux/amd64 ubuntu:25.04
---platform linux/amd64 ubuntu:24:04
+--platform linux/amd64 ubuntu:24.04
 --platform linux/amd64 archlinux:latest
 --platform linux/amd64 archlinux:base
 --platform linux/amd64 opensuse
