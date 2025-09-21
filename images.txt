@@ -23,3 +23,15 @@
 --platform linux/amd64 gzxhwq/sing-box:server
 --platform linux/amd64 gzxhwq/sing-box:dev
 --platform linux/amd64 alpine
+--platform linux/amd64 debian:testing
+--platform linux/amd64 debian:stable
+--platform linux/amd64 ununtu:rolling
+--platform linux/amd64 ubuntu:latest
+--platform linux/amd64 ubuntu:25.04
+--platform linux/amd64 ubuntu:24:04
+--platform linux/amd64 archlinux:latest
+--platform linux/amd64 archlinux:base
+--platform linux/amd64 opensuse
+
+
+
