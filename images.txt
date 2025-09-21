@@ -32,6 +32,11 @@
 --platform linux/amd64 archlinux:latest
 --platform linux/amd64 archlinux:base
 --platform linux/amd64 opensuse
+--platform linux/amd64 fedora:41
+--platform linux/amd64 fedora:42
+--platform linux/amd64 fedora:43
+--platform linux/amd64 fedora:44
+--platform linux/amd64 fedora:latest
 
 
 
