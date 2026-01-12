@@ -57,3 +57,4 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 rust:latest
 --platform linux/amd64 opensuse/leap
 --platform linux/amd64 leplusorg/kali
+--platform linux/amd64 tindy2013/subconverter
