@@ -58,3 +58,8 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 opensuse/leap
 --platform linux/amd64 leplusorg/kali
 --platform linux/amd64 tindy2013/subconverter
+--platform linux/amd64 budtmo/docker-android:emulator_14.0
+--platform linux/amd64 budtmo/docker-android:emulator_13.0
+--platform linux/amd64 budtmo/docker-android:emulator_12.0
+--platform linux/amd64 budtmo/docker-android:emulator_11.0
+--platform linux/amd64 budtmo/docker-android:emulator_10.0
