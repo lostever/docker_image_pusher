@@ -63,3 +63,5 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 budtmo/docker-android:emulator_12.0
 --platform linux/amd64 budtmo/docker-android:emulator_11.0
 --platform linux/amd64 budtmo/docker-android:emulator_10.0
+--platform linux/amd64 xream/sub-store:http-meta
+--platform linux/amd64 xream/sub-store:latest
