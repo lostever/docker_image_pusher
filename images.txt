@@ -65,3 +65,16 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 budtmo/docker-android:emulator_10.0
 --platform linux/amd64 xream/sub-store:http-meta
 --platform linux/amd64 xream/sub-store:latest
+--platform linux/amd64 tensorflow/tensorflow:latest
+--platform linux/amd64 tensorflow/tensorflow:latest-gpu
+--platform linux/amd64 tensorflow/tensorflow:latest-gpu-jupyter
+--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.6-cudnn9-runtime
+--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+--platform linux/amd64 pytorch/pytorch:2.9.1-cuda13.0-cudnn9-runtime
+--platform linux/amd64 pytorch/pytorch:2.9.1-cuda13.0-cudnn9-devel
+--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel
+--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.6-cudnn9-devel
+--platform linux/amd64 debian:latest
+--platform linux/amd64 debian:testing
+--platform linux/amd64 debian:stable
+
