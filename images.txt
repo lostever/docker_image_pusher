@@ -77,4 +77,4 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 debian:latest
 --platform linux/amd64 debian:testing
 --platform linux/amd64 debian:stable
-
+--platform linux/amd64 centos:7
