@@ -1,3 +1,4 @@
 --platform=linux/amd64 apache/doris:fe-3.0.8
 --platform=linux/amd64 apache/doris:be-3.0.8
+--platform=linux/amd64 nginx:stable-perl
 
