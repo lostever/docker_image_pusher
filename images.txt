@@ -1,3 +1,4 @@
+# 由于workflow默认使用ubuntu-latest虚拟机，所以默认拉取的镜像都是AMD64
 --platform=linux/amd64 nginx:stable-perl
 # Doris
 --platform=linux/amd64 apache/doris:fe-2.1.11
