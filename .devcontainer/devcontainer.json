@@ -1,9 +1,0 @@
-{
-    "image": "mcr.microsoft.com/devcontainers/universal:2",
-    "features": {
-        // 安装 Skopeo 解决你刚才遇到的 "command not found" 问题
-        "ghcr.io/devcontainers-contrib/features/skopeo:1": {},
-        // 确保 Docker 功能完整
-        "ghcr.io/devcontainers/features/docker-in-docker:1": {}
-    }
-}
