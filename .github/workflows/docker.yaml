@@ -58,108 +58,61 @@ jobs:
     - name: Build and push image Aliyun
       run: |
         docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY
-        # 数据预处理,判断镜像是否重名
+        
+        # 预处理重名逻辑
         declare -A duplicate_images
         declare -A temp_map
         while IFS= read -r line || [ -n "$line" ]; do
-            # 忽略空行与注释
-            [[ -z "$line" ]] && continue
-            if echo "$line" | grep -q '^\s*#'; then
-                continue
-            fi
-            
-            # 获取镜像的完整名称，例如kasmweb/nginx:1.25.3（命名空间/镜像名:版本号）
+            [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
             image=$(echo "$line" | awk '{print $NF}')
-            # 将@sha256:等字符删除
             image="${image%%@*}"
-            echo "image $image"
-            # 获取镜像名:版本号  例如nginx:1.25.3
             image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            echo "image_name_tag $image_name_tag"
-            # 获取命名空间 例如kasmweb,  这里有种特殊情况 docker.io/nginx，把docker.io当成命名空间，也OK
             name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            echo "name_space: $name_space"
-            # 这里不要是空值影响判断
-            name_space="${name_space}_"
-            # 获取镜像名例如nginx
             image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
-            echo "image_name: $image_name"
             
-            # 如果镜像存在于数组中，则添加temp_map
+            name_space_key="${name_space}_"
             if [[ -n "${temp_map[$image_name]}" ]]; then
-                 # 如果temp_map已经存在镜像名，判断是不是同一命名空间
-                 if [[ "${temp_map[$image_name]}" != $name_space  ]]; then
-                    echo "duplicate image name: $image_name"
+                 if [[ "${temp_map[$image_name]}" != $name_space_key ]]; then
                     duplicate_images[$image_name]="true"
                  fi
             else
-                # 存镜像的命名空间
-                temp_map[$image_name]=$name_space
-            fi       
+                temp_map[$image_name]=$name_space_key
+            fi        
         done < images.txt
         
-        
+        # 处理与推送逻辑
         while IFS= read -r line || [ -n "$line" ]; do
-            # 忽略空行与注释
-            [[ -z "$line" ]] && continue
-            if echo "$line" | grep -q '^\s*#'; then
+            [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
+            
+            # 解析镜像信息
+            image=$(echo "$line" | awk '{print $NF}')
+            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
+            image_name_tag="${image_name_tag%%@*}"
+            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
+            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
+            
+            # 拼接目标镜像名称
+            name_space_prefix=""
+            if [[ -n "${duplicate_images[$image_name]}" && -n "${name_space}" ]]; then
+                name_space_prefix="${name_space}_"
+            fi
+            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${name_space_prefix}${image_name_tag}"
+
+            # --- 优化点：检查远程镜像是否存在 ---
+            echo "正在检查镜像是否存在: $new_image"
+            if skopeo inspect docker://$new_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
+                echo ">>> [跳过] 镜像 $new_image 已存在于阿里云仓库。"
                 continue
             fi
-        
-            echo "docker pull $line"
+            # ----------------------------------
+
+            echo ">>> [开始处理] $line"
             docker pull $line
-            platform=$(echo "$line" | awk -F'--platform[ =]' '{if (NF>1) print $2}' | awk '{print $1}')
-            echo "platform is $platform"
-
-            # ------------------------------
-            # 源代码：如果存在架构信息 将架构信息拼到镜像名称前面
-            # if [ -z "$platform" ]; then
-            #     platform_prefix=""
-            # else
-            #     platform_prefix="${platform//\//_}_"
-            # fi
-            # echo "platform_prefix is $platform_prefix"
-            
-            # 修改处：强制前缀为空，即只保仓库名称不保留架构名称
-            platform_prefix="" 
-            # --------------------------
-
-            
-            # 获取镜像的完整名称，例如kasmweb/nginx:1.25.3（命名空间/镜像名:版本号）
-            image=$(echo "$line" | awk '{print $NF}')
-
-            # 获取 镜像名:版本号  例如nginx:1.25.3
-            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            # 获取命名空间 例如kasmweb  这里有种特殊情况 docker.io/nginx，把docker.io当成命名空间，也OK
-            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            # 获取镜像名例  例如nginx
-            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
-        
-            name_space_prefix=""
-            # 如果镜像名重名
-            if [[ -n "${duplicate_images[$image_name]}" ]]; then
-               #如果命名空间非空，将命名空间加到前缀
-               if [[ -n "${name_space}" ]]; then
-                  name_space_prefix="${name_space}_"
-               fi
-            fi
-            
-            # 将@sha256:等字符删除
-            image_name_tag="${image_name_tag%%@*}"
-            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$platform_prefix$name_space_prefix$image_name_tag"
-            echo "docker tag $image $new_image"
             docker tag $image $new_image
-            echo "docker push $new_image"
             docker push $new_image
-            echo "开始清理磁盘空间"
-            echo "=============================================================================="
-            df -hT
-            echo "=============================================================================="
-            docker rmi $image
-            docker rmi $new_image
-            echo "磁盘空间清理完毕"
-            echo "=============================================================================="
-            df -hT
-            echo "=============================================================================="     
+            
+            # 清理
+            docker rmi $image $new_image
+            echo ">>> [完成] $new_image 已推送并清理本地缓存。"
             
         done < images.txt
