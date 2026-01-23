@@ -17,3 +17,13 @@ flink:2.2.0
 spark:4.0.1
 # funny tools
 chuanwen/cowsay:latest
+
+# 测试 1: 组织 A 的镜像 (预期：alpine_git)
+alpine/git:latest
+
+# 测试 2: 组织 B 的镜像 (预期：bitnami_git)
+# 即使都叫 git，但因为组织不同，在阿里云上会分别存为 alpine_git 和 bitnami_git
+bitnami/git:latest
+
+# 测试 3: 没有组织的官方镜像 (预期：library_alpine)
+alpine:latest
