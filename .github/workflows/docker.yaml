@@ -1,9 +1,11 @@
 name: Docker
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 保留手动触发
   push:
     branches: [ main ]
+    paths:
+      - 'images.txt'  # 只有images.txt变动才触发
 
 
 env:
