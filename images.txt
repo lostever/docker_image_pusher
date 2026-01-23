@@ -1,15 +1,16 @@
-# 由于workflow默认使用ubuntu-latest虚拟机，所以默认拉取的镜像都是AMD64
---platform=linux/amd64 nginx:stable-perl
+# workflow默认使用ubuntu-latest虚拟机，默认拉取的镜像都是AMD64
+# --platform=liux/arm64 nginx:stable-perl
+
 # Doris
---platform=linux/amd64 apache/doris:fe-2.1.11
---platform=linux/amd64 apache/doris:be-2.1.11
---platform=linux/amd64 apache/doris:fe-3.0.8
---platform=linux/amd64 apache/doris:be-3.0.8
---platform=linux/amd64 apache/doris:fe-3.1.3
---platform=linux/amd64 apache/doris:be-3.1.3
---platform=linux/amd64 apache/doris:fe-4.0.2
---platform=linux/amd64 apache/doris:be-4.0.2
---platform=linux/amd64 apache/doris:operator-25.8.0
+apache/doris:fe-2.1.11
+apache/doris:be-2.1.11
+apache/doris:fe-3.0.8
+apache/doris:be-3.0.8
+apache/doris:fe-3.1.3
+apache/doris:be-3.1.3
+apache/doris:fe-4.0.2
+apache/doris:be-4.0.2
+apache/doris:operator-25.8.0
 # Flink
 flink:2.2.0
 # spark
