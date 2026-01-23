@@ -12,3 +12,5 @@ apache/doris:operator-25.8.0
 apache/flink:2.2.0
 #---spark---
 apache/spark:4.0.1
+#---postgres---
+postgres:18
