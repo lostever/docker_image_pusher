@@ -9,4 +9,8 @@
 --platform=linux/amd64 apache/doris:fe-4.0.2
 --platform=linux/amd64 apache/doris:be-4.0.2
 --platform=linux/amd64 apache/doris:operator-25.8.0
+# Flink
+flink:2.2.0
+# spark
+spark:4.0.1
 
