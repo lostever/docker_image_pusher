@@ -110,13 +110,21 @@ jobs:
             docker pull $line
             platform=$(echo "$line" | awk -F'--platform[ =]' '{if (NF>1) print $2}' | awk '{print $1}')
             echo "platform is $platform"
-            # 如果存在架构信息 将架构信息拼到镜像名称前面
-            if [ -z "$platform" ]; then
-                platform_prefix=""
-            else
-                platform_prefix="${platform//\//_}_"
-            fi
-            echo "platform_prefix is $platform_prefix"
+
+            # ------------------------------
+            # 源代码：如果存在架构信息 将架构信息拼到镜像名称前面
+            # if [ -z "$platform" ]; then
+            #     platform_prefix=""
+            # else
+            #     platform_prefix="${platform//\//_}_"
+            # fi
+            # echo "platform_prefix is $platform_prefix"
+            
+            # 修改处：强制前缀为空，即只保仓库名称不保留架构名称
+            platform_prefix="" 
+            # --------------------------
+
+            
             # 获取镜像的完整名称，例如kasmweb/nginx:1.25.3（命名空间/镜像名:版本号）
             image=$(echo "$line" | awk '{print $NF}')
 
