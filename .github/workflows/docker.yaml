@@ -1,12 +1,11 @@
-name: Docker
+name: Docker Image Sync to Aliyun
 
 on:
-  workflow_dispatch:  # 保留手动触发
+  workflow_dispatch:
   push:
     branches: [ main ]
     paths:
-      - 'images.txt'  # 只有images.txt变动才触发
-
+      - 'images.txt'
 
 env:
   ALIYUN_REGISTRY: "${{ secrets.ALIYUN_REGISTRY }}"
@@ -15,106 +14,82 @@ env:
   ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}"
 
 jobs:
-
   build:
-    name: Pull
+    name: Sync Images
     runs-on: ubuntu-latest
     steps:
-    - name: Before freeing up disk space
-      run: |
-        echo "Before freeing up disk space"
-        echo "=============================================================================="
-        df -hT
-        echo "=============================================================================="
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # 增加可用磁盘空间
-    - name: Maximize build space
-      uses: easimon/maximize-build-space@master
-      with:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 128
+          remove-dotnet: 'true'
+          remove-haskell: 'true'
+          build-mount-path: '/var/lib/docker/'
 
-        root-reserve-mb: 2048
-        swap-size-mb: 128
-        remove-dotnet: 'true'
-        remove-haskell: 'true'
-        # 如果空间还是不够用，可以把以下开启，清理出更多空间
-        # remove-android: 'true'
-        # remove-codeql: 'true'
-        build-mount-path: '/var/lib/docker/'
+      - name: Restart docker
+        run: sudo service docker restart
 
-    - name: Restart docker
-      run: sudo service docker restart
+      - name: Docker Setup Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Free up disk space complete
-      run: |
-        echo "Free up disk space complete"
-        echo "=============================================================================="
-        df -hT
-        echo "=============================================================================="
+      - name: Sync and Push to Aliyun
+        run: |
+          # 登录阿里云
+          echo "$ALIYUN_REGISTRY_PASSWORD" | docker login -u "$ALIYUN_REGISTRY_USER" --password-stdin "$ALIYUN_REGISTRY"
+          
+          while IFS= read -r line || [ -n "$line" ]; do
+              # 忽略空行和注释
+              [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
+              
+              # 1. 解析原始镜像信息
+              # 比如从 "docker.io/apache/doris:fe-2.1.11" 提取 "apache/doris:fe-2.1.11"
+              raw_image=$(echo "$line" | awk '{print $NF}')
+              # 去除可能存在的 @sha256:xxx 摘要
+              full_image="${raw_image%%@*}"
+              
+              # 2. 提取镜像名和标签 (例如: doris:fe-2.1.11)
+              image_name_tag=$(echo "$full_image" | awk -F'/' '{print $NF}')
+              
+              # 3. 提取并转换组织名
+              # 如果有斜线，取镜像名前面的部分并将 / 换成 _；如果没有斜线，默认为 library
+              if [[ "$full_image" == *"/"* ]]; then
+                  # 这里的逻辑是将除了最后一部分以外的所有路径都作为组织名，并把 / 换成 _
+                  org_part=$(echo "$full_image" | sed "s|\/${image_name_tag}||" | tr '/' '_')
+              else
+                  org_part="library"
+              fi
+              
+              # 4. 构造阿里云上的目标镜像名
+              # 结果：registry.../namespace/apache_doris:fe-2.1.11
+              new_repo_name="${org_part}_${image_name_tag}"
+              target_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$new_repo_name"
 
-    - name: Checkout Code
-      uses: actions/checkout@v4
+              echo "-------------------------------------------------------"
+              echo "源镜像: $full_image"
+              echo "目标镜像: $target_image"
 
-    - name: Docker Setup Buildx
-      uses: docker/setup-buildx-action@v3
+              # 5. 使用 skopeo 检查远程是否已存在，避免重复拉取推送
+              if skopeo inspect docker://$target_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
+                  echo ">>> [跳过] 目标镜像已存在，无需同步。"
+                  continue
+              fi
 
-    - name: Build and push image Aliyun
-      run: |
-        docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY
-        
-        # 预处理重名逻辑
-        declare -A duplicate_images
-        declare -A temp_map
-        while IFS= read -r line || [ -n "$line" ]; do
-            [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
-            image=$(echo "$line" | awk '{print $NF}')
-            image="${image%%@*}"
-            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
-            
-            name_space_key="${name_space}_"
-            if [[ -n "${temp_map[$image_name]}" ]]; then
-                 if [[ "${temp_map[$image_name]}" != $name_space_key ]]; then
-                    duplicate_images[$image_name]="true"
-                 fi
-            else
-                temp_map[$image_name]=$name_space_key
-            fi        
-        done < images.txt
-        
-        # 处理与推送逻辑
-        while IFS= read -r line || [ -n "$line" ]; do
-            [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
-            
-            # 解析镜像信息
-            image=$(echo "$line" | awk '{print $NF}')
-            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            image_name_tag="${image_name_tag%%@*}"
-            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
-            
-            # 拼接目标镜像名称
-            name_space_prefix=""
-            if [[ -n "${duplicate_images[$image_name]}" && -n "${name_space}" ]]; then
-                name_space_prefix="${name_space}_"
-            fi
-            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${name_space_prefix}${image_name_tag}"
-
-            # --- 优化点：检查远程镜像是否存在 ---
-            echo "正在检查镜像是否存在: $new_image"
-            if skopeo inspect docker://$new_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
-                echo ">>> [跳过] 镜像 $new_image 已存在于阿里云仓库。"
-                continue
-            fi
-            # ----------------------------------
-
-            echo ">>> [开始处理] $line"
-            docker pull $line
-            docker tag $image $new_image
-            docker push $new_image
-            
-            # 清理
-            docker rmi $image $new_image
-            echo ">>> [完成] $new_image 已推送并清理本地缓存。"
-            
-        done < images.txt
+              # 6. 执行拉取、打标和推送
+              echo ">>> [同步中] 正在拉取源镜像..."
+              if docker pull "$full_image"; then
+                  docker tag "$full_image" "$target_image"
+                  echo ">>> [推送中] 正在上传至阿里云..."
+                  docker push "$target_image"
+                  
+                  # 清理本地镜像空间
+                  docker rmi "$full_image" "$target_image"
+                  echo ">>> [成功] $target_image 同步完成并已清理本地缓存。"
+              else
+                  echo ">>> [失败] 无法拉取源镜像: $full_image"
+              fi
+              
+          done < images.txt
