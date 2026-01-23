@@ -15,4 +15,5 @@ apache/doris:operator-25.8.0
 flink:2.2.0
 # spark
 spark:4.0.1
-
+# funny tools
+chuanwen/cowsay:latest
