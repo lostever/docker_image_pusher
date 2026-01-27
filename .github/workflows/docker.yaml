@@ -99,12 +99,12 @@ jobs:
               STATUS_TITLE="✅ 镜像同步成功报告"
           fi
 
-          # 2. 准备同步清单
+          # 2. 准备同步清单内容
           LOG_CONTENT="${{ env.SYNC_RESULT }}"
-          [ -z "$LOG_CONTENT" ] && LOG_CONTENT="未发现变更镜像"
+          [ -z "$LOG_CONTENT" ] && LOG_CONTENT="未发现变更镜像 (All skipped)"
 
-          # 3. 构造富文本 JSON (msg_type 为 post)
-          # post 模式下，飞书会自动处理排版，不会显示 \n
+          # 3. 构造富文本 JSON (修正后的 jq 语法)
+          # 使用 \($var) 这种插值方式最稳妥，不会触发拼接错误
           PAYLOAD=$(jq -n \
             --arg title "$STATUS_TITLE" \
             --arg log "$LOG_CONTENT" \
@@ -119,8 +119,9 @@ jobs:
                     title: $title,
                     content: [
                       [{tag: "text", text: "━━━━━━━━━━━━━━━━"}],
-                      [{tag: "text", text: "📊 统计: 成功 " + $s + " | 失败 " + $f}],
-                      [{tag: "text", text: "📦 同步清单:\n" + $log}],
+                      [{tag: "text", text: "📊 统计: 成功 \($s) | 失败 \($f)"}],
+                      [{tag: "text", text: "📦 同步清单:\n\($log)"}],
+                      [{tag: "text", text: "\n"}],
                       [{tag: "a", text: "🔗 点击查看 GitHub Action 运行日志", href: $url}]
                     ]
                   }
@@ -128,4 +129,5 @@ jobs:
               }
             }')
 
+          # 4. 发送请求
           curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
