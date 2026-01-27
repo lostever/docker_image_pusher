@@ -12,6 +12,7 @@ env:
   ALIYUN_NAME_SPACE: "${{ secrets.ALIYUN_NAME_SPACE }}"
   ALIYUN_REGISTRY_USER: "${{ secrets.ALIYUN_REGISTRY_USER }}"
   ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}"
+  WEBHOOK_URL: "${{ secrets.WEBHOOK_URL }}" # 在 Secrets 中配置飞书或企微地址
 
 jobs:
   build:
@@ -33,63 +34,80 @@ jobs:
       - name: Restart docker
         run: sudo service docker restart
 
-      - name: Docker Setup Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Sync and Push to Aliyun
+        id: sync_step
         run: |
-          # 登录阿里云
           echo "$ALIYUN_REGISTRY_PASSWORD" | docker login -u "$ALIYUN_REGISTRY_USER" --password-stdin "$ALIYUN_REGISTRY"
           
+          SYNC_SUMMARY=""
+          SUCCESS_COUNT=0
+          FAILURE_COUNT=0
+
           while IFS= read -r line || [ -n "$line" ]; do
-              # 忽略空行和注释
               [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
               
-              # 1. 解析原始镜像信息
-              # 比如从 "docker.io/apache/doris:fe-2.1.11" 提取 "apache/doris:fe-2.1.11"
               raw_image=$(echo "$line" | awk '{print $NF}')
-              # 去除可能存在的 @sha256:xxx 摘要
               full_image="${raw_image%%@*}"
-              
-              # 2. 提取镜像名和标签 (例如: doris:fe-2.1.11)
               image_name_tag=$(echo "$full_image" | awk -F'/' '{print $NF}')
               
-              # 3. 提取并转换组织名
-              # 如果有斜线，取镜像名前面的部分并将 / 换成 _；如果没有斜线，默认为 library
               if [[ "$full_image" == *"/"* ]]; then
-                  # 这里的逻辑是将除了最后一部分以外的所有路径都作为组织名，并把 / 换成 _
                   org_part=$(echo "$full_image" | sed "s|\/${image_name_tag}||" | tr '/' '_')
               else
                   org_part="library"
               fi
               
-              # 4. 构造阿里云上的目标镜像名
-              # 结果：registry.../namespace/apache_doris:fe-2.1.11
               new_repo_name="${org_part}_${image_name_tag}"
               target_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$new_repo_name"
 
-              echo "-------------------------------------------------------"
-              echo "源镜像: $full_image"
-              echo "目标镜像: $target_image"
+              echo "同步中: $full_image -> $target_image"
 
-              # 5. 使用 skopeo 检查远程是否已存在，避免重复拉取推送
+              # 检查是否存在
               if skopeo inspect docker://$target_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
-                  echo ">>> [跳过] 目标镜像已存在，无需同步。"
+                  SYNC_SUMMARY="$SYNC_SUMMARY\n⚪ $image_name_tag (跳过)"
                   continue
               fi
 
-              # 6. 执行拉取、打标和推送
-              echo ">>> [同步中] 正在拉取源镜像..."
-              if docker pull "$full_image"; then
-                  docker tag "$full_image" "$target_image"
-                  echo ">>> [推送中] 正在上传至阿里云..."
-                  docker push "$target_image"
-                  
-                  # 清理本地镜像空间
+              if docker pull "$full_image" && docker tag "$full_image" "$target_image" && docker push "$target_image"; then
                   docker rmi "$full_image" "$target_image"
-                  echo ">>> [成功] $target_image 同步完成并已清理本地缓存。"
+                  SYNC_SUMMARY="$SYNC_SUMMARY\n✅ $image_name_tag"
+                  ((SUCCESS_COUNT++))
               else
-                  echo ">>> [失败] 无法拉取源镜像: $full_image"
+                  SYNC_SUMMARY="$SYNC_SUMMARY\n❌ $image_name_tag (失败)"
+                  ((FAILURE_COUNT++))
               fi
-              
           done < images.txt
+
+          # 将结果存入环境变量，供下一步发送通知使用
+          echo "SYNC_RESULT<<EOF" >> $GITHUB_ENV
+          echo -e "$SYNC_SUMMARY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "SUCCESS_COUNT=$SUCCESS_COUNT" >> $GITHUB_ENV
+          echo "FAILURE_COUNT=$FAILURE_COUNT" >> $GITHUB_ENV
+
+      - name: 发送 Webhook 通知
+        if: always()
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then echo "未配置 Webhook，跳过通知"; exit 0; fi
+
+          # 构建通知标题
+          if [ "${{ job.status }}" == "success" ] && [ "${{ env.FAILURE_COUNT }}" -eq "0" ]; then
+            TITLE="✅ 阿里云镜像同步成功"
+          else
+            TITLE="⚠️ 阿里云镜像同步完成 (含失败/异常)"
+          fi
+
+          # 构建飞书格式消息 (也兼容部分企微机器人)
+          MSG_TEXT="$TITLE\n\n同步详情:${{ env.SYNC_RESULT }}\n\n总计: 成功 ${{ env.SUCCESS_COUNT }} / 失败 ${{ env.FAILURE_COUNT }}\n详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # 飞书格式 payload
+          PAYLOAD=$(cat <<EOF
+          {
+            "msg_type": "text",
+            "content": {
+              "text": "$MSG_TEXT"
+            }
+          }
+          EOF
+          )
+
+          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK_URL"
