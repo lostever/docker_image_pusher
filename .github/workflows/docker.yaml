@@ -92,34 +92,20 @@ jobs:
         run: |
           if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then exit 0; fi
 
-          # 1. 准备数据
-          S_COUNT=${{ env.SUCCESS_COUNT }}
-          F_COUNT=${{ env.FAILURE_COUNT }}
-          S_RESULT="${{ env.SYNC_RESULT }}"
-          
-          # 2. 逻辑判定：根据执行情况设计不同的显示内容
-          if [ "$F_COUNT" -gt 0 ]; then
-              STATUS_TITLE="Docker镜像同步：同步异常"
-              MAIN_MSG="❌ 警告：部分镜像同步失败，请及时处理。"
-              DETAIL_TITLE="失败日志："
-              DETAIL_CONTENT="$S_RESULT"
-          elif [ "$S_COUNT" -gt 0 ]; then
-              STATUS_TITLE="Docker镜像同步：任务成功"
-              MAIN_MSG="✅ 本次新增同步镜像：$S_COUNT 个"
-              DETAIL_TITLE="新增清单："
-              DETAIL_CONTENT="$S_RESULT"
+          # 1. 状态判定
+          if [ "${{ env.FAILURE_COUNT }}" -gt 0 ]; then
+              STATUS="异常"; ICON="🚨"; LIST="${{ env.SYNC_RESULT }}"
+          elif [ "${{ env.SUCCESS_COUNT }}" -gt 0 ]; then
+              STATUS="成功"; ICON="✅"; LIST="${{ env.SYNC_RESULT }}"
           else
-              STATUS_TITLE="Docker镜像同步：保持最新"
-              MAIN_MSG="☕ 暂无新镜像需要同步，一切已是最新。"
-              DETAIL_TITLE="检查状态："
-              DETAIL_CONTENT="未发现变更项"
+              STATUS="最新"; ICON="☕"; LIST="未发现变更项"
           fi
-    
+
+
           PAYLOAD=$(jq -n \
-            --arg title "$STATUS_TITLE" \
-            --arg msg "$MAIN_MSG" \
-            --arg d_title "$DETAIL_TITLE" \
-            --arg d_content "$DETAIL_CONTENT" \
+            --arg title "Docker 镜像同步：$STATUS" \
+            --arg body "$ICON 任务执行完毕" \
+            --arg list "$LIST" \
             --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{
               msg_type: "post",
@@ -129,10 +115,8 @@ jobs:
                     title: $title,
                     content: [
                       [{tag: "text", text: "--------------------------------"}],
-                      [{tag: "text", text: $msg}],
-                      [{tag: "text", text: $d_title}],
-                      [{tag: "text", text: $d_content}],
-                      [{tag: "text", text: "\n"}],
+                      [{tag: "text", text: ($body + "\n")}],
+                      [{tag: "text", text: ($list + "\n")}],
                       [{tag: "a", text: "🔍 查看 GitHub Action 执行日志", href: $url}]
                     ]
                   }
@@ -140,4 +124,7 @@ jobs:
               }
             }')
 
-          curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
+          # 3. 发送请求
+          # 关键点：不要使用 echo 打印 PAYLOAD，直接 curl 发送
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "$PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
