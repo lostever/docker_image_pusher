@@ -83,31 +83,39 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
           echo "SUCCESS_COUNT=$SUCCESS_COUNT" >> $GITHUB_ENV
           echo "FAILURE_COUNT=$FAILURE_COUNT" >> $GITHUB_ENV
-
       - name: 发送 Webhook 通知
         if: always()
         run: |
           if [ -z "$WEBHOOK_URL" ]; then echo "未配置 Webhook，跳过通知"; exit 0; fi
 
-          # 构建通知标题
+          # 构建标题
           if [ "${{ job.status }}" == "success" ] && [ "${{ env.FAILURE_COUNT }}" -eq "0" ]; then
             TITLE="✅ 阿里云镜像同步成功"
           else
             TITLE="⚠️ 阿里云镜像同步完成 (含失败/异常)"
           fi
 
-          # 构建飞书格式消息 (也兼容部分企微机器人)
-          MSG_TEXT="$TITLE\n\n同步详情:${{ env.SYNC_RESULT }}\n\n总计: 成功 ${{ env.SUCCESS_COUNT }} / 失败 ${{ env.FAILURE_COUNT }}\n详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # 构建纯文本内容
+          RAW_CONTENT=$(cat <<EOF
+          $TITLE
 
-          # 飞书格式 payload
-          PAYLOAD=$(cat <<EOF
-          {
-            "msg_type": "text",
-            "content": {
-              "text": "$MSG_TEXT"
-            }
-          }
+          同步详情:
+          ${{ env.SYNC_RESULT }}
+
+          总计: 成功 ${{ env.SUCCESS_COUNT }} / 失败 ${{ env.FAILURE_COUNT }}
+          详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EOF
           )
 
-          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK_URL"
+          # --arg 把 shell 变量传给 jq
+          PAYLOAD=$(jq -n --arg content "$RAW_CONTENT" \
+            '{
+              msg_type: "text",
+              content: {
+                text: $content
+              }
+            }')
+
+          echo "Sending payload to Feishu..."
+          curl -X POST -H "Content-Type: application/json" \
+            -d "$PAYLOAD" "$WEBHOOK_URL"
