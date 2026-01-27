@@ -92,24 +92,34 @@ jobs:
         run: |
           if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then exit 0; fi
 
-          # 1. 定义标题
-          if [ "${{ env.FAILURE_COUNT }}" -gt 0 ]; then
-              STATUS_TITLE="Docker镜像同步: 异常"
+          # 1. 准备数据
+          S_COUNT=${{ env.SUCCESS_COUNT }}
+          F_COUNT=${{ env.FAILURE_COUNT }}
+          S_RESULT="${{ env.SYNC_RESULT }}"
+          
+          # 2. 逻辑判定：根据执行情况设计不同的显示内容
+          if [ "$F_COUNT" -gt 0 ]; then
+              STATUS_TITLE="Docker镜像同步：同步异常"
+              MAIN_MSG="❌ 警告：部分镜像同步失败，请及时处理。"
+              DETAIL_TITLE="失败日志："
+              DETAIL_CONTENT="$S_RESULT"
+          elif [ "$S_COUNT" -gt 0 ]; then
+              STATUS_TITLE="Docker镜像同步：任务成功"
+              MAIN_MSG="✅ 本次新增同步镜像：$S_COUNT 个"
+              DETAIL_TITLE="新增清单："
+              DETAIL_CONTENT="$S_RESULT"
           else
-              STATUS_TITLE="Docker镜像同步: 完成"
+              STATUS_TITLE="Docker镜像同步：保持最新"
+              MAIN_MSG="☕ 暂无新镜像需要同步，一切已是最新。"
+              DETAIL_TITLE="检查状态："
+              DETAIL_CONTENT="未发现变更项"
           fi
-
-          # 2. 准备同步详情内容
-          LOG_CONTENT="${{ env.SYNC_RESULT }}"
-          [ -z "$LOG_CONTENT" ] && LOG_CONTENT="  (无新增镜像)"
-
-          # 3. 构造极简富文本
-          # 将所有文字放入一个 text 标签中，这样排版最紧凑，像普通聊天消息一样自然
+    
           PAYLOAD=$(jq -n \
             --arg title "$STATUS_TITLE" \
-            --arg log "$LOG_CONTENT" \
-            --arg s "${{ env.SUCCESS_COUNT }}" \
-            --arg f "${{ env.FAILURE_COUNT }}" \
+            --arg msg "$MAIN_MSG" \
+            --arg d_title "$DETAIL_TITLE" \
+            --arg d_content "$DETAIL_CONTENT" \
             --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{
               msg_type: "post",
@@ -118,20 +128,12 @@ jobs:
                   zh_cn: {
                     title: $title,
                     content: [
-                      [
-                        {
-                          tag: "text",
-                          text: ("--------------------------------\n" +
-                                 "📊 统计: 成功 \($s) / 失败 \($f)\n" +
-                                 "📦 清单:\n\($log)\n\n" +
-                                 "🔗 详情: ")
-                        },
-                        {
-                          tag: "a",
-                          text: "查看Action日志",
-                          href: $url
-                        }
-                      ]
+                      [{tag: "text", text: "--------------------------------"}],
+                      [{tag: "text", text: $msg}],
+                      [{tag: "text", text: $d_title}],
+                      [{tag: "text", text: $d_content}],
+                      [{tag: "text", text: "\n"}],
+                      [{tag: "a", text: "🔍 查看 GitHub Action 执行日志", href: $url}]
                     ]
                   }
                 }
