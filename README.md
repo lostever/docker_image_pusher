@@ -77,3 +77,5 @@ apache/doris:fe-2.1.11
 > ✅ 本次新增同步镜像：2 个
 > ✨ library_mysql:8.0
 > ✨ apache_doris:fe-2.1.11
+> ![20260127122221_594_32](https://github.com/user-attachments/assets/36e35447-31a4-4e3e-85d4-ca9005d32424)
+
