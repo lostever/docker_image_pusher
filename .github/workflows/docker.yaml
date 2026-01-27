@@ -34,6 +34,7 @@ jobs:
       - name: Restart docker
         run: sudo service docker restart
 
+        
       - name: Sync and Push to Aliyun
         id: sync_step
         run: |
@@ -59,63 +60,69 @@ jobs:
               new_repo_name="${org_part}_${image_name_tag}"
               target_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$new_repo_name"
 
-              echo "同步中: $full_image -> $target_image"
-
-              # 检查是否存在
+              # 检查镜像是否存在
               if skopeo inspect docker://$target_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
-                  SYNC_SUMMARY="$SYNC_SUMMARY\n⚪ $image_name_tag (跳过)"
+                  echo ">>> Skip: $image_name_tag"
                   continue
               fi
 
+              # 执行同步
               if docker pull "$full_image" && docker tag "$full_image" "$target_image" && docker push "$target_image"; then
                   docker rmi "$full_image" "$target_image"
-                  SYNC_SUMMARY="$SYNC_SUMMARY\n✅ $image_name_tag"
-                  ((SUCCESS_COUNT++))
+                  # 只有成功的才加入 SUMMARY
+                  SYNC_SUMMARY="${SYNC_SUMMARY}\n✨ ${image_name_tag}"
+                  SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
               else
-                  SYNC_SUMMARY="$SYNC_SUMMARY\n❌ $image_name_tag (失败)"
-                  ((FAILURE_COUNT++))
+                  # 只有失败的才加入 SUMMARY
+                  SYNC_SUMMARY="${SYNC_SUMMARY}\n🚨 ${image_name_tag} (推送失败)"
+                  FAILURE_COUNT=$((FAILURE_COUNT + 1))
               fi
           done < images.txt
 
-          # 将结果存入环境变量，供下一步发送通知使用
-          echo "SYNC_RESULT<<EOF" >> $GITHUB_ENV
-          echo -e "$SYNC_SUMMARY" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          # 写入环境变量
           echo "SUCCESS_COUNT=$SUCCESS_COUNT" >> $GITHUB_ENV
           echo "FAILURE_COUNT=$FAILURE_COUNT" >> $GITHUB_ENV
+          {
+            echo 'SYNC_RESULT<<EOF'
+            echo -e "$SYNC_SUMMARY"
+            echo 'EOF'
+          } >> $GITHUB_ENV
+
       - name: 发送 Webhook 通知
         if: always()
         run: |
-          if [ -z "$WEBHOOK_URL" ]; then echo "未配置 Webhook，跳过通知"; exit 0; fi
+          if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then exit 0; fi
 
-          # 构建标题
-          if [ "${{ job.status }}" == "success" ] && [ "${{ env.FAILURE_COUNT }}" -eq "0" ]; then
-            TITLE="✅ 阿里云镜像同步成功"
+          S_COUNT=${{ env.SUCCESS_COUNT }}
+          F_COUNT=${{ env.FAILURE_COUNT }}
+
+          # 1. 判定标题和主状态
+          if [ "$F_COUNT" -gt 0 ]; then
+              TITLE="❌ 阿里云镜像同步失败"
+              CONTENT="⚠️ 警告：有 $F_COUNT 个镜像同步出现异常，请及时检查。"
+          elif [ "$S_COUNT" -gt 0 ]; then
+              TITLE="✅ 阿里云镜像同步成功"
+              CONTENT="本次新增同步镜像如下："
           else
-            TITLE="⚠️ 阿里云镜像同步完成 (含失败/异常)"
+            # 如果全是跳过，为了不骚扰，可以选择不发，或者发一条简洁的
+            TITLE="☕ 同步任务完成 (无新镜像)"
+            CONTENT="检测到 images.txt 中暂无新镜像需要同步。"
           fi
 
-          # 构建纯文本内容
-          RAW_CONTENT=$(cat <<EOF
+          # 2. 组装最终文本 (移除跳过的列表，只显示 SYNC_RESULT)
+          # 使用加粗和分割线让格式更好看
+          RAW_TEXT=$(cat <<EOF
           $TITLE
-
-          同步详情:
+          ━━━━━━━━━━━━━━━━
+          $CONTENT
           ${{ env.SYNC_RESULT }}
 
-          总计: 成功 ${{ env.SUCCESS_COUNT }} / 失败 ${{ env.FAILURE_COUNT }}
-          详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          📊 统计: 成功 $S_COUNT | 失败 $F_COUNT
+          🔗 详情: [查看 GitHub Action 日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           EOF
           )
 
-          # --arg 把 shell 变量传给 jq
-          PAYLOAD=$(jq -n --arg content "$RAW_CONTENT" \
-            '{
-              msg_type: "text",
-              content: {
-                text: $content
-              }
-            }')
-
-          echo "Sending payload to Feishu..."
-          curl -X POST -H "Content-Type: application/json" \
-            -d "$PAYLOAD" "$WEBHOOK_URL"
+          # 3. 发送
+          JSON_PAYLOAD=$(jq -n --arg msg "$RAW_TEXT" '{"msg_type":"text","content":{"text":$msg}}')
+          curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
+      
