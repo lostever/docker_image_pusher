@@ -12,7 +12,7 @@ env:
   ALIYUN_NAME_SPACE: "${{ secrets.ALIYUN_NAME_SPACE }}"
   ALIYUN_REGISTRY_USER: "${{ secrets.ALIYUN_REGISTRY_USER }}"
   ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}"
-  WEBHOOK_URL: "${{ secrets.WEBHOOK_URL }}"
+  WEBHOOK_URL: "${{ secrets.WEBHOOK_URL }}" # 在 Secrets 中配置飞书或企微地址
 
 jobs:
   build:
@@ -33,6 +33,7 @@ jobs:
 
       - name: Restart docker
         run: sudo service docker restart
+
         
       - name: Sync and Push to Aliyun
         id: sync_step
@@ -92,39 +93,35 @@ jobs:
         run: |
           if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then exit 0; fi
 
-          # 1. 状态判定
-          if [ "${{ env.FAILURE_COUNT }}" -gt 0 ]; then
-              STATUS="异常"; ICON="🚨"; LIST="${{ env.SYNC_RESULT }}"
-          elif [ "${{ env.SUCCESS_COUNT }}" -gt 0 ]; then
-              STATUS="成功"; ICON="✅"; LIST="${{ env.SYNC_RESULT }}"
+          S_COUNT=${{ env.SUCCESS_COUNT }}
+          F_COUNT=${{ env.FAILURE_COUNT }}
+
+          # 1. 判定标题和主状态
+          if [ "$F_COUNT" -gt 0 ]; then
+              TITLE="❌ 阿里云镜像同步失败"
+              CONTENT="⚠️ 警告：有 $F_COUNT 个镜像同步出现异常，请及时检查。"
+          elif [ "$S_COUNT" -gt 0 ]; then
+              TITLE="✅ 阿里云镜像同步成功"
+              CONTENT="本次新增同步镜像如下："
           else
-              STATUS="最新"; ICON="☕"; LIST="未发现变更项"
+            # 如果全是跳过，为了不骚扰，可以选择不发，或者发一条简洁的
+            TITLE="☕ 同步任务完成 (无新镜像)"
+            CONTENT="检测到 images.txt 中暂无新镜像需要同步。"
           fi
 
+          # 2. 组装最终文本 (移除跳过的列表，只显示 SYNC_RESULT)
+          RAW_TEXT=$(cat <<EOF
+          $TITLE
+          ━━━━━━━━━━━━━━━━
+          $CONTENT
+          ${{ env.SYNC_RESULT }}
 
-          PAYLOAD=$(jq -n \
-            --arg title "Docker 镜像同步：$STATUS" \
-            --arg body "$ICON 任务执行完毕" \
-            --arg list "$LIST" \
-            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{
-              msg_type: "post",
-              content: {
-                post: {
-                  zh_cn: {
-                    title: $title,
-                    content: [
-                      [{tag: "text", text: "--------------------------------"}],
-                      [{tag: "text", text: ($body + "\n")}],
-                      [{tag: "text", text: ($list + "\n")}],
-                      [{tag: "a", text: "🔍 查看 GitHub Action 执行日志", href: $url}]
-                    ]
-                  }
-                }
-              }
-            }')
+          📊 统计: 成功 $S_COUNT | 失败 $F_COUNT
+          🔗 详情: [查看 GitHub Action 日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )
 
-          # 3. 发送请求
-          # 关键点：不要使用 echo 打印 PAYLOAD，直接 curl 发送
-          curl -s -X POST -H "Content-Type: application/json" \
-            -d "$PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
+          # 3. 发送
+          JSON_PAYLOAD=$(jq -n --arg msg "$RAW_TEXT" '{"msg_type":"text","content":{"text":$msg}}')
+          curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
+      
