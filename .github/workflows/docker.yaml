@@ -90,40 +90,66 @@ jobs:
         run: |
           if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then echo "未配置 Webhook"; exit 0; fi
 
-          # 使用环境变量防止 shell 注入
           S_COUNT=${{ env.SUCCESS_COUNT }}
           F_COUNT=${{ env.FAILURE_COUNT }}
           S_RESULT="${{ env.SYNC_RESULT }}"
 
-          # 1. 动态构造消息标题和内容
+          # 1. 动态设定卡片颜色和图标
+          # 蓝色-info(1), 绿色-success(3), 红色-error(4), 橙色-warning(2)
           if [ "$F_COUNT" -gt 0 ]; then
-              TITLE="❌ 阿里云镜像同步异常"
-              DESC="警告：检测到同步过程中存在失败任务。"
+              THEME="red"
+              TITLE="🚨 Docker 镜像同步异常"
+              STATUS_TXT="检测到同步过程中存在失败任务，请排查。"
           elif [ "$S_COUNT" -gt 0 ]; then
-              TITLE="✅ 阿里云镜像同步成功"
-              DESC="本次新增同步镜像如下："
+              THEME="green"
+              TITLE="✅ Docker 镜像同步成功"
+              STATUS_TXT="镜像已成功推送至阿里云私有仓库。"
           else
-              TITLE="☕ 镜像同步任务完成"
-              DESC="暂无新镜像需要同步，一切已是最新。"
-              S_RESULT="（无变动镜像）"
+              THEME="blue"
+              TITLE="ℹ️ Docker 镜像同步完成"
+              STATUS_TXT="扫描完成：暂无新镜像需要同步。"
+              S_RESULT="未发现变更"
           fi
 
-          # 2. 组装 Markdown 风格的纯文本（飞书 text 类型支持 \n）
-          RAW_TEXT=$(cat <<EOF
-          $TITLE
-          ━━━━━━━━━━━━━━━━
-          📝 状态：$DESC
+          # 2. 构造卡片 Markdown 内容
+          # 使用卡片模式可以完美解决换行符显示问题
+          CARD_CONTENT="**📅 任务时间**: $(date '+%Y-%m-%d %H:%M:%S')\n**📝 任务状态**: $STATUS_TXT\n\n**📦 新增镜像清单**:\n${S_RESULT:-无}\n\n**📊 数据统计**:\n- 成功数量: <font color='green'>**$S_COUNT**</font>\n- 失败数量: <font color='red'>**$F_COUNT**</font>"
 
-          📦 新增镜像：
-          $S_RESULT
-
-          📊 统计：成功 $S_COUNT | 失败 $F_COUNT
-          🔗 详情：[查看 Action 日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          EOF
-          )
-
-          # 3. 使用 jq 确保 JSON 绝对合法
-          PAYLOAD=$(jq -n --arg msg "$RAW_TEXT" '{"msg_type":"text","content":{"text":$msg}}')
+          # 3. 使用 jq 构造飞书卡片 JSON (交互式卡片类型)
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg theme "$THEME" \
+            --arg content "$CARD_CONTENT" \
+            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              msg_type: "interactive",
+              card: {
+                header: {
+                  template: $theme,
+                  title: { tag: "plain_text", content: $title }
+                },
+                elements: [
+                  {
+                    tag: "div",
+                    text: { tag: "lark_md", content: $content }
+                  },
+                  {
+                    tag: "hr"
+                  },
+                  {
+                    tag: "action",
+                    actions: [
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "🔍 查看日志详情" },
+                        type: "default",
+                        url: $url
+                      }
+                    ]
+                  }
+                ]
+              }
+            }')
 
           # 4. 执行发送
           curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
