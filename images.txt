@@ -14,3 +14,4 @@ apache/flink:2.2.0
 apache/spark:4.0.1
 #---postgres---
 postgres:18
+httpd:2.4.66
