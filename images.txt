@@ -78,3 +78,6 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 debian:testing
 --platform linux/amd64 debian:stable
 --platform linux/amd64 centos:7
+--platform linux/amd64 ghcr.io/home-assistant/home-assistant:stable
+--platform linux/amd64 ollama/ollama:rocm
+--platform linux/amd64 ollama/ollama:latest
