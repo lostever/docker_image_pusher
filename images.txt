@@ -13,11 +13,11 @@ ghcr.io/vanilla-os/waydroid:main
 --platform linux/amd64 python:3.9
 --platform linux/amd64 python:3.8
 --platform linux/amd64 python:3.7
---platform linux/amd64 enwaiax/x-ui:latest
---platform linux/amd64 enwaiax/x-ui:alpha-zh
---platform linux/amd64 enwaiax/x-ui:beta
+#--platform linux/amd64 enwaiax/x-ui:latest
+#--platform linux/amd64 enwaiax/x-ui:alpha-zh
+#--platform linux/amd64 enwaiax/x-ui:beta
 --platform linux/amd64 mzz2017/v2raya
---platform linux/amd64 dheaps/nfs-server-alpine
+#--platform linux/amd64 dheaps/nfs-server-alpine
 #--platform linux/amd64 p3terx/yacd
 #--platform linux/amd64 gzxhwq/sing-box:latest
 #--platform linux/amd64 gzxhwq/sing-box:client
