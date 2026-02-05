@@ -2,11 +2,13 @@
 #支持私库
 # k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0
 # xhofe/alist:latest
-ghcr.io/vanilla-os/waydroid:main
+# ghcr.io/vanilla-os/waydroid:main
 #支持指定架构
 --platform linux/amd64 telegraf
 --platform linux/amd64 influxdb
 --platform linux/amd64 python
+--platform linux/amd64 python:3.14
+--platform linux/amd64 python:3.13
 --platform linux/amd64 python:3.12
 --platform linux/amd64 python:3.11
 --platform linux/amd64 python:3.10
@@ -17,7 +19,7 @@ ghcr.io/vanilla-os/waydroid:main
 #--platform linux/amd64 enwaiax/x-ui:alpha-zh
 #--platform linux/amd64 enwaiax/x-ui:beta
 --platform linux/amd64 mzz2017/v2raya
-#--platform linux/amd64 dheaps/nfs-server-alpine
+--platform linux/amd64 dheaps/nfs-server-alpine
 #--platform linux/amd64 p3terx/yacd
 #--platform linux/amd64 gzxhwq/sing-box:latest
 #--platform linux/amd64 gzxhwq/sing-box:client
