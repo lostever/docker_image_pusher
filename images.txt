@@ -82,5 +82,5 @@
 --platform linux/amd64 rhasspy/wyoming-whisper:latest
 --platform linux/amd64 rhasspy/wyoming-piper:latest
 --platform linux/amd64 searxng/searxng:latest
---platform linux/amd64 nordwestt/kokoro-wyoming:latest
---platform linux/amd64 darvyn974/edgettsgen:latest
+#--platform linux/amd64 nordwestt/kokoro-wyoming:latest
+#--platform linux/amd64 darvyn974/edgettsgen:latest
