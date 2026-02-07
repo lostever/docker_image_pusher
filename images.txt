@@ -82,3 +82,4 @@
 --platform linux/amd64 rhasspy/wyoming-whisper:latest
 --platform linux/amd64 rhasspy/wyoming-piper:latest
 --platform linux/amd64 searxng/searxng:latest
+--platform linux/amd64 ghcr.io/rhasspy/wyoming-kokoro:latest
