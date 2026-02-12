@@ -86,3 +86,4 @@
 #--platform linux/amd64 darvyn974/edgettsgen:latest
 --platform linux/amd64 alpine/openclaw:latest
 --platform linux/amd64 alpine/openclaw:main
+--platform linux/amd64 zeroclue/comfyui:production-torch2.8.0-cu128
