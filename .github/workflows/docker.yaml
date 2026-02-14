@@ -1,159 +1,130 @@
-name: Docker
+name: Docker Image Sync to Aliyun
 
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
   schedule:
-    - cron: '0  0 * * *'
+    - cron: '0  19 * * *'
 
+    paths:
+      - 'images.txt'
 
 env:
   ALIYUN_REGISTRY: "${{ secrets.ALIYUN_REGISTRY }}"
   ALIYUN_NAME_SPACE: "${{ secrets.ALIYUN_NAME_SPACE }}"
   ALIYUN_REGISTRY_USER: "${{ secrets.ALIYUN_REGISTRY_USER }}"
   ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}"
+  WEBHOOK_URL: "${{ secrets.WEBHOOK_URL }}" # 在 Secrets 中配置飞书或企微地址
 
 jobs:
-
   build:
-    name: Pull
+    name: Sync Images
     runs-on: ubuntu-latest
     steps:
-    - name: Before freeing up disk space
-      run: |
-        echo "Before freeing up disk space"
-        echo "=============================================================================="
-        df -hT
-        echo "=============================================================================="
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # 增加可用磁盘空间
-    - name: Maximize build space
-      uses: easimon/maximize-build-space@master
-      with:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 128
+          remove-dotnet: 'true'
+          remove-haskell: 'true'
+          build-mount-path: '/var/lib/docker/'
 
-        root-reserve-mb: 2048
-        swap-size-mb: 128
-        remove-dotnet: 'true'
-        remove-haskell: 'true'
-        # 如果空间还是不够用，可以把以下开启，清理出更多空间
-        # remove-android: 'true'
-        # remove-codeql: 'true'
-        build-mount-path: '/var/lib/docker/'
+      - name: Restart docker
+        run: sudo service docker restart
 
-    - name: Restart docker
-      run: sudo service docker restart
-
-    - name: Free up disk space complete
-      run: |
-        echo "Free up disk space complete"
-        echo "=============================================================================="
-        df -hT
-        echo "=============================================================================="
-
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Docker Setup Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build and push image Aliyun
-      run: |
-        docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY
-        # 数据预处理,判断镜像是否重名
-        declare -A duplicate_images
-        declare -A temp_map
-        while IFS= read -r line || [ -n "$line" ]; do
-            # 忽略空行与注释
-            [[ -z "$line" ]] && continue
-            if echo "$line" | grep -q '^\s*#'; then
-                continue
-            fi
-            
-            # 获取镜像的完整名称，例如kasmweb/nginx:1.25.3（命名空间/镜像名:版本号）
-            image=$(echo "$line" | awk '{print $NF}')
-            # 将@sha256:等字符删除
-            image="${image%%@*}"
-            echo "image $image"
-            # 获取镜像名:版本号  例如nginx:1.25.3
-            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            echo "image_name_tag $image_name_tag"
-            # 获取命名空间 例如kasmweb,  这里有种特殊情况 docker.io/nginx，把docker.io当成命名空间，也OK
-            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            echo "name_space: $name_space"
-            # 这里不要是空值影响判断
-            name_space="${name_space}_"
-            # 获取镜像名例如nginx
-            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
-            echo "image_name: $image_name"
-            
-            # 如果镜像存在于数组中，则添加temp_map
-            if [[ -n "${temp_map[$image_name]}" ]]; then
-                 # 如果temp_map已经存在镜像名，判断是不是同一命名空间
-                 if [[ "${temp_map[$image_name]}" != $name_space  ]]; then
-                    echo "duplicate image name: $image_name"
-                    duplicate_images[$image_name]="true"
-                 fi
-            else
-                # 存镜像的命名空间
-                temp_map[$image_name]=$name_space
-            fi       
-        done < images.txt
         
-        
-        while IFS= read -r line || [ -n "$line" ]; do
-            # 忽略空行与注释
-            [[ -z "$line" ]] && continue
-            if echo "$line" | grep -q '^\s*#'; then
-                continue
-            fi
-        
-            echo "docker pull $line"
-            docker pull $line
-            platform=$(echo "$line" | awk -F'--platform[ =]' '{if (NF>1) print $2}' | awk '{print $1}')
-            echo "platform is $platform"
-            # 如果存在架构信息 将架构信息拼到镜像名称前面
-            if [ -z "$platform" ]; then
-                platform_prefix=""
-            else
-                platform_prefix="${platform//\//_}_"
-            fi
-            echo "platform_prefix is $platform_prefix"
-            # 获取镜像的完整名称，例如kasmweb/nginx:1.25.3（命名空间/镜像名:版本号）
-            image=$(echo "$line" | awk '{print $NF}')
+      - name: Sync and Push to Aliyun
+        id: sync_step
+        run: |
+          echo "$ALIYUN_REGISTRY_PASSWORD" | docker login -u "$ALIYUN_REGISTRY_USER" --password-stdin "$ALIYUN_REGISTRY"
+          
+          SYNC_SUMMARY=""
+          SUCCESS_COUNT=0
+          FAILURE_COUNT=0
 
-            # 获取 镜像名:版本号  例如nginx:1.25.3
-            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            # 获取命名空间 例如kasmweb  这里有种特殊情况 docker.io/nginx，把docker.io当成命名空间，也OK
-            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            # 获取镜像名例  例如nginx
-            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
-        
-            name_space_prefix=""
-            # 如果镜像名重名
-            if [[ -n "${duplicate_images[$image_name]}" ]]; then
-               #如果命名空间非空，将命名空间加到前缀
-               if [[ -n "${name_space}" ]]; then
-                  name_space_prefix="${name_space}_"
-               fi
-            fi
-            
-            # 将@sha256:等字符删除
-            image_name_tag="${image_name_tag%%@*}"
-            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$platform_prefix$name_space_prefix$image_name_tag"
-            echo "docker tag $image $new_image"
-            docker tag $image $new_image
-            echo "docker push $new_image"
-            docker push $new_image
-            echo "开始清理磁盘空间"
-            echo "=============================================================================="
-            df -hT
-            echo "=============================================================================="
-            docker rmi $image
-            docker rmi $new_image
-            echo "磁盘空间清理完毕"
-            echo "=============================================================================="
-            df -hT
-            echo "=============================================================================="     
-            
-        done < images.txt
+          while IFS= read -r line || [ -n "$line" ]; do
+              [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
+              
+              raw_image=$(echo "$line" | awk '{print $NF}')
+              full_image="${raw_image%%@*}"
+              image_name_tag=$(echo "$full_image" | awk -F'/' '{print $NF}')
+              
+              if [[ "$full_image" == *"/"* ]]; then
+                  org_part=$(echo "$full_image" | sed "s|\/${image_name_tag}||" | tr '/' '_')
+              else
+                  org_part="library"
+              fi
+              
+              new_repo_name="${org_part}_${image_name_tag}"
+              target_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$new_repo_name"
+
+              # 检查镜像是否存在
+              if skopeo inspect docker://$target_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
+                  echo ">>> Skip: $image_name_tag"
+                  continue
+              fi
+
+              # 执行同步
+              if docker pull "$full_image" && docker tag "$full_image" "$target_image" && docker push "$target_image"; then
+                  docker rmi "$full_image" "$target_image"
+                  # 只有成功的才加入 SUMMARY
+                  SYNC_SUMMARY="${SYNC_SUMMARY}\n✨ ${image_name_tag}"
+                  SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              else
+                  # 只有失败的才加入 SUMMARY
+                  SYNC_SUMMARY="${SYNC_SUMMARY}\n🚨 ${image_name_tag} (推送失败)"
+                  FAILURE_COUNT=$((FAILURE_COUNT + 1))
+              fi
+          done < images.txt
+
+          # 写入环境变量
+          echo "SUCCESS_COUNT=$SUCCESS_COUNT" >> $GITHUB_ENV
+          echo "FAILURE_COUNT=$FAILURE_COUNT" >> $GITHUB_ENV
+          {
+            echo 'SYNC_RESULT<<EOF'
+            echo -e "$SYNC_SUMMARY"
+            echo 'EOF'
+          } >> $GITHUB_ENV
+
+      - name: 发送 Webhook 通知
+        if: always()
+        run: |
+          if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then exit 0; fi
+
+          S_COUNT=${{ env.SUCCESS_COUNT }}
+          F_COUNT=${{ env.FAILURE_COUNT }}
+
+          # 1. 判定标题和主状态
+          if [ "$F_COUNT" -gt 0 ]; then
+              TITLE="❌ 阿里云镜像同步失败"
+              CONTENT="⚠️ 警告：有 $F_COUNT 个镜像同步出现异常，请及时检查。"
+          elif [ "$S_COUNT" -gt 0 ]; then
+              TITLE="✅ 阿里云镜像同步成功"
+              CONTENT="本次新增同步镜像如下："
+          else
+            # 如果全是跳过，为了不骚扰，可以选择不发，或者发一条简洁的
+            TITLE="☕ 同步任务完成 (无新镜像)"
+            CONTENT="检测到 images.txt 中暂无新镜像需要同步。"
+          fi
+
+          # 2. 组装最终文本 (移除跳过的列表，只显示 SYNC_RESULT)
+          RAW_TEXT=$(cat <<EOF
+          $TITLE
+          ━━━━━━━━━━━━━━━━
+          $CONTENT
+          ${{ env.SYNC_RESULT }}
+
+          📊 统计: 成功 $S_COUNT | 失败 $F_COUNT
+          🔗 详情: [查看 GitHub Action 日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )
+
+          # 3. 发送
+          JSON_PAYLOAD=$(jq -n --arg msg "$RAW_TEXT" '{"msg_type":"text","content":{"text":$msg}}')
+          curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
+      
