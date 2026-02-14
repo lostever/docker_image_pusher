@@ -1,80 +1,81 @@
-# Docker Images Pusher
+# Aliyun Image Pusher
 
-使用Github Action将国外的Docker镜像转存到阿里云私有仓库，供国内服务器使用，免费易用<br>
-- 支持DockerHub, gcr.io, k8s.io, ghcr.io等任意仓库<br>
-- 支持最大40GB的大型镜像<br>
-- 使用阿里云的官方线路，速度快<br>
+### 基于 GitHub Actions 的镜像同步工具 (Fork 优化版)
 
-视频教程：https://www.bilibili.com/video/BV1Zn4y19743/
+本项目是一个轻量级的镜像中转工具，旨在将 Docker Hub 的镜像自动同步至阿里云私有仓库（ACR），解决国内环境拉取镜像慢的问题。
 
-作者：**[技术爬爬虾](https://github.com/tech-shrimp/me)**<br>
-B站，抖音，Youtube全网同名，转载请注明作者<br>
+## ✨ 本次 Fork 引入的优化 (Key Enhancements)
 
-## 使用方式
+对比原版逻辑，本项目进行了以下核心改进：
 
-
-### 配置阿里云
-登录阿里云容器镜像服务<br>
-https://cr.console.aliyun.com/<br>
-启用个人实例，创建一个命名空间（**ALIYUN_NAME_SPACE**）
-![](/doc/命名空间.png)
-
-访问凭证–>获取环境变量<br>
-用户名（**ALIYUN_REGISTRY_USER**)<br>
-密码（**ALIYUN_REGISTRY_PASSWORD**)<br>
-仓库地址（**ALIYUN_REGISTRY**）<br>
-
-![](/doc/用户名密码.png)
+1. **组织名隔离机制 (Namespace Isolation)**：
+* **改进**：引入组织名前缀化逻辑。所有镜像自动映射为 `组织名_镜像名:标签`（如 `apache_doris:latest`），确保不同来源的同名镜像互不冲突。
 
 
-### Fork本项目
-Fork本项目<br>
-#### 启动Action
-进入您自己的项目，点击Action，启用Github Action功能<br>
-#### 配置环境变量
-进入Settings->Secret and variables->Actions->New Repository secret
-![](doc/配置环境变量.png)
-将上一步的**四个值**<br>
-ALIYUN_NAME_SPACE,ALIYUN_REGISTRY_USER，ALIYUN_REGISTRY_PASSWORD，ALIYUN_REGISTRY<br>
-配置成环境变量
+2. **官方镜像标准化**：
+* 自动识别 Docker 官方镜像，统一归类到 `library_` 前缀下，使镜像列表规整统一。
 
-### 添加镜像
-打开images.txt文件，添加你想要的镜像 
-可以加tag，也可以不用(默认latest)<br>
-可添加 --platform=xxxxx 的参数指定镜像架构<br>
-可使用 k8s.gcr.io/kube-state-metrics/kube-state-metrics 格式指定私库<br>
-可使用 #开头作为注释<br>
-![](doc/images.png)
-文件提交后，自动进入Github Action构建
 
-### 使用镜像
-回到阿里云，镜像仓库，点击任意镜像，可查看镜像状态。(可以改成公开，拉取镜像免登录)
-![](doc/开始使用.png)
+3. **智能增量同步**：
+* 集成 `skopeo` 探测功能。**已存在的镜像自动跳过**，极大节省构建时间，避免重复推送。
 
-在国内服务器pull镜像, 例如：<br>
+
+4. **超大镜像支持**：
+* 自动释放构建环境磁盘空间。支持数 GB 级别的重型镜像（如 Doris, Oracle）平稳同步。
+
+
+5. **大厂级运维告警 (New 🚀)**：
+* **集成飞书 Webhook**：同步完成后自动发送富文本通知。
+* **极简视觉设计**：采用富文本卡片排版，支持成功/失败状态区分、新增镜像清单展示，以及**中文超链接**直接跳转至 GitHub Logs。
+
+
+
+## 🚀 快速使用
+
+### 1. 配置 Secrets
+
+在 GitHub 仓库的 `Settings` -> `Secrets and variables` -> `Actions` 中添加：
+
+* `ALIYUN_REGISTRY`: 阿里云仓库地址 (如 `registry.cn-hangzhou.aliyuncs.com`)
+* `ALIYUN_NAME_SPACE`: 命名空间
+* `ALIYUN_REGISTRY_USER`: 阿里云镜像服务用户名
+* `ALIYUN_REGISTRY_PASSWORD`: 阿里云镜像服务访问令牌 (临时密码)
+* `WEBHOOK_URL`: (可选) 飞书/企微机器人 Webhook 地址
+
+### 2. 编辑镜像列表
+
+修改 `images.txt` 文件，每行填入一个镜像地址：
+
+```text
+# 官方镜像会自动转为 library_mysql:8.0
+mysql:8.0
+# 自动转为 apache_doris:fe-2.1.11
+apache/doris:fe-2.1.11
+
 ```
-docker pull registry.cn-hangzhou.aliyuncs.com/shrimp-images/alpine
-```
-registry.cn-hangzhou.aliyuncs.com 即 ALIYUN_REGISTRY(阿里云仓库地址)<br>
-shrimp-images 即 ALIYUN_NAME_SPACE(阿里云命名空间)<br>
-alpine 即 阿里云中显示的镜像名<br>
 
-### 多架构
-需要在images.txt中用 --platform=xxxxx手动指定镜像架构
-指定后的架构会以前缀的形式放在镜像名字前面
-![](doc/多架构.png)
+### 3. 执行同步
 
-### 镜像重名
-程序自动判断是否存在名称相同, 但是属于不同命名空间的情况。
-如果存在，会把命名空间作为前缀加在镜像名称前。
-例如:
-```
-xhofe/alist
-xiaoyaliu/alist
-```
-![](doc/镜像重名.png)
+* **自动触发**：修改并提交 `images.txt` 后，工作流会自动运行。
+* **手动触发**：在 `Actions` 页面手动点击 `Run workflow`。
 
-### 定时执行
-修改/.github/workflows/docker.yaml文件
-添加 schedule即可定时执行(此处cron使用UTC时区)
-![](doc/定时执行.png)
+## 📝 命名转换规则参考
+
+| 源镜像 (Docker Hub) | 阿里云仓库名 (ACR) |
+| --- | --- |
+| `mysql:latest` | `library_mysql:latest` |
+| `apache/doris:2.1` | `apache_doris:2.1` |
+| `bitnami/git:latest` | `bitnami_git:latest` |
+
+## 🔔 通知预览
+
+配置 `WEBHOOK_URL` 后，你将收到如下格式的精简通知：
+
+> ## **Docker镜像同步：成功**
+> 
+> 
+> ✅ 本次新增同步镜像：2 个
+> ✨ library_mysql:8.0
+> ✨ apache_doris:fe-2.1.11
+> ![20260127122221_594_32](https://github.com/user-attachments/assets/36e35447-31a4-4e3e-85d4-ca9005d32424)
+
