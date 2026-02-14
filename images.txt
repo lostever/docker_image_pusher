@@ -1,18 +1,90 @@
-#---Doris---
-apache/doris:fe-2.1.11
-apache/doris:be-2.1.11
-apache/doris:fe-3.0.8
-apache/doris:be-3.0.8
-apache/doris:fe-3.1.3
-apache/doris:be-3.1.3
-apache/doris:fe-4.0.2
-apache/doris:be-4.0.2
-apache/doris:operator-25.8.0
-#---Flink---
-apache/flink:2.2.0
-#---spark---
-apache/spark:4.0.1
-#---postgres---
-postgres:18
-httpd:2.4.66
-louislam/uptime-kuma:1
+--platform linux/amd64 nginx
+#支持私库
+# k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0
+# xhofe/alist:latest
+# ghcr.io/vanilla-os/waydroid:main
+#支持指定架构
+--platform linux/amd64 telegraf
+--platform linux/amd64 influxdb
+--platform linux/amd64 python
+--platform linux/amd64 python:3.14
+--platform linux/amd64 python:3.13
+--platform linux/amd64 python:3.12
+--platform linux/amd64 python:3.11
+--platform linux/amd64 python:3.10
+--platform linux/amd64 python:3.9
+--platform linux/amd64 python:3.8
+--platform linux/amd64 python:3.7
+#--platform linux/amd64 enwaiax/x-ui:latest
+#--platform linux/amd64 enwaiax/x-ui:alpha-zh
+#--platform linux/amd64 enwaiax/x-ui:beta
+--platform linux/amd64 mzz2017/v2raya
+--platform linux/amd64 dheaps/nfs-server-alpine
+#--platform linux/amd64 p3terx/yacd
+#--platform linux/amd64 gzxhwq/sing-box:latest
+#--platform linux/amd64 gzxhwq/sing-box:client
+#--platform linux/amd64 gzxhwq/sing-box:server
+#--platform linux/amd64 gzxhwq/sing-box:dev
+--platform linux/amd64 alpine
+#--platform linux/amd64 debian:testing
+--platform linux/amd64 debian:stable
+#--platform linux/amd64 ubuntu:rolling
+--platform linux/amd64 ubuntu:latest
+--platform linux/amd64 ubuntu:25.04
+#--platform linux/amd64 ubuntu:24.04
+--platform linux/amd64 kalilinux/kali-rolling
+--platform linux/amd64 archlinux:latest
+#--platform linux/amd64 archlinux:base
+--platform linux/amd64 opensuse/leap
+#--platform linux/amd64 opensuse/tumbleweed
+#--platform linux/amd64 fedora:41
+#--platform linux/amd64 fedora:42
+#--platform linux/amd64 fedora:43
+--platform linux/amd64 fedora:44
+--platform linux/amd64 fedora:latest
+--platform linux/amd64 memcached
+--platform linux/amd64 busybox
+--platform linux/amd64 redis
+--platform linux/amd64 postgres
+--platform linux/amd64 node
+--platform linux/amd64 mysql
+--platform linux/amd64 httpd
+--platform linux/amd64 mongo
+--platform linux/amd64 rabbitmq
+--platform linux/amd64 golang
+--platform linux/amd64 mariadb
+--platform linux/amd64 rockylinux/rockylinux
+--platform linux/amd64 wordpress
+--platform linux/amd64 eclipse-mosquitto
+--platform linux/amd64 rust:slim
+--platform linux/amd64 rust:latest
+--platform linux/amd64 tindy2013/subconverter
+#--platform linux/amd64 budtmo/docker-android:emulator_14.0
+#--platform linux/amd64 budtmo/docker-android:emulator_13.0
+#--platform linux/amd64 budtmo/docker-android:emulator_12.0
+#--platform linux/amd64 budtmo/docker-android:emulator_11.0
+#--platform linux/amd64 budtmo/docker-android:emulator_10.0
+--platform linux/amd64 xream/sub-store:http-meta
+--platform linux/amd64 xream/sub-store:latest
+#--platform linux/amd64 tensorflow/tensorflow:latest
+#--platform linux/amd64 tensorflow/tensorflow:latest-gpu
+#--platform linux/amd64 tensorflow/tensorflow:latest-gpu-jupyter
+#--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.6-cudnn9-runtime
+#--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+#--platform linux/amd64 pytorch/pytorch:2.9.1-cuda13.0-cudnn9-runtime
+#--platform linux/amd64 pytorch/pytorch:2.9.1-cuda13.0-cudnn9-devel
+#--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel
+#--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.6-cudnn9-devel
+--platform linux/amd64 centos:7
+#--platform linux/amd64 ollama/ollama:rocm
+--platform linux/amd64 ollama/ollama:latest
+--platform linux/amd64 ghcr.io/open-webui/open-webui:main
+--platform linux/amd64 ghcr.io/home-assistant/home-assistant:stable
+--platform linux/amd64 rhasspy/wyoming-whisper:latest
+--platform linux/amd64 rhasspy/wyoming-piper:latest
+--platform linux/amd64 searxng/searxng:latest
+#--platform linux/amd64 nordwestt/kokoro-wyoming:latest
+#--platform linux/amd64 darvyn974/edgettsgen:latest
+--platform linux/amd64 alpine/openclaw:latest
+--platform linux/amd64 alpine/openclaw:main
+--platform linux/amd64 zeroclue/comfyui:production-torch2.8.0-cu128
