@@ -6,6 +6,9 @@ on:
     branches: [ main ]
     paths:
       - 'images.txt'
+  # 新增：每天北京时间凌晨3点运行（UTC时间19:00，因为UTC+8=北京时间）
+  schedule:
+    - cron: '0 19 * * *'
 
 env:
   ALIYUN_REGISTRY: "${{ secrets.ALIYUN_REGISTRY }}"
