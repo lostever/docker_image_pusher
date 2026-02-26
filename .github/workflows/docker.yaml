@@ -25,31 +25,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Maximize build space (增强版)
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 4096          # 增加根目录预留空间
-          swap-size-mb: 2048             # 增大交换空间
-          remove-dotnet: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'          # 移除 CodeQL
-          remove-android: 'true'         # 移除 Android SDK
-          remove-docker-images: 'true'   # 移除预安装的 Docker 镜像
-          build-mount-path: '/var/lib/docker/'
+      # - name: Maximize build space (增强版)
+      #   uses: easimon/maximize-build-space@master
+      #   with:
+      #     root-reserve-mb: 4096          # 增加根目录预留空间
+      #     swap-size-mb: 2048             # 增大交换空间
+      #     remove-dotnet: 'true'
+      #     remove-haskell: 'true'
+      #     remove-codeql: 'true'          # 移除 CodeQL
+      #     remove-android: 'true'         # 移除 Android SDK
+      #     remove-docker-images: 'true'   # 移除预安装的 Docker 镜像
+      #     build-mount-path: '/var/lib/docker/'
 
-      - name: 清理 Docker 缓存和旧镜像 (预清理)
-        run: |
-          # 显示当前磁盘使用情况
-          df -h
-          # 停止 Docker 服务
-          sudo systemctl stop docker
-          # 清理 Docker 所有数据
-          sudo rm -rf /var/lib/docker/*
-          sudo rm -rf /var/lib/containerd/*
-          # 重启 Docker
-          sudo systemctl start docker
-          # 再次检查磁盘空间
-          df -h
+      # - name: 清理 Docker 缓存和旧镜像 (预清理)
+      #   run: |
+      #     # 显示当前磁盘使用情况
+      #     df -h
+      #     # 停止 Docker 服务
+      #     sudo systemctl stop docker
+      #     # 清理 Docker 所有数据
+      #     sudo rm -rf /var/lib/docker/*
+      #     sudo rm -rf /var/lib/containerd/*
+      #     # 重启 Docker
+      #     sudo systemctl start docker
+      #     # 再次检查磁盘空间
+      #     df -h
 
       - name: 配置 Docker 优化 (减少空间占用)
         run: |
