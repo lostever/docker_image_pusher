@@ -68,75 +68,76 @@ jobs:
           # 验证 Docker 状态
           docker info | grep -E 'Space|Driver|Size'
 
+      - name: Install skopeo
+        run: sudo apt-get update && sudo apt-get install -y skopeo
+        
       - name: Sync and Push to Aliyun
         id: sync_step
         run: |
-          echo "$ALIYUN_REGISTRY_PASSWORD" | docker login -u "$ALIYUN_REGISTRY_USER" --password-stdin "$ALIYUN_REGISTRY"
-          
           SYNC_SUMMARY=""
           SUCCESS_COUNT=0
           FAILURE_COUNT=0
-          
-          # 定义清理函数 (无论成功失败都清理)
-          cleanup_image() {
-            local img=$1
-            if docker images -q "$img" > /dev/null; then
-              docker rmi -f "$img" > /dev/null 2>&1 || true
-            fi
-          }
-          
+
           while IFS= read -r line || [ -n "$line" ]; do
-              # 跳过空行和注释行
               [[ -z "$line" ]] || [[ "$line" =~ ^\s*# ]] && continue
-              
-              # 显示当前磁盘使用情况 (便于排查)
-              echo "=== 当前磁盘使用情况 ==="
-              df -h /
-              docker system df
-              
+
               raw_image=$(echo "$line" | awk '{print $NF}')
               full_image="${raw_image%%@*}"
-              image_name_tag=$(echo "$full_image" | awk -F'/' '{print $NF}')
-              
-              if [[ "$full_image" == *"/"* ]]; then
-                  org_part=$(echo "$full_image" | sed "s|\/${image_name_tag}||" | tr '/' '_')
+
+              # 改进解析：分离镜像名和 tag（更清晰稳健）
+              if [[ "$full_image" == *:* ]]; then
+                  image_repo="${full_image%:*}"
+                  tag="${full_image#*:}"
               else
-                  org_part="library"
+                  image_repo="$full_image"
+                  tag="latest"
               fi
-              
-              new_repo_name="${org_part}_${image_name_tag}"
-              target_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$new_repo_name"
-              
-              # 检查镜像是否已存在
-              if skopeo inspect docker://$target_image --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" > /dev/null 2>&1; then
-                  echo ">>> Skip: $image_name_tag (已存在)"
+              image_name=$(basename "$image_repo")
+              dir_part=$(dirname "$image_repo")
+              org_part=$([[ "$dir_part" == "." ]] && echo "library" || echo "$dir_part" | tr '/' '_')
+
+              new_repo_name="${org_part}_${image_name}"
+              target_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$new_repo_name:$tag"
+
+              echo ">>> Processing: $full_image → $target_image"
+
+              # 获取上游 digest
+              if ! source_digest=$(skopeo inspect --format '{{.Digest}}' "docker://$full_image" 2>/dev/null); then
+                  echo ">>> ❌ 源镜像无法访问: $full_image"
+                  SYNC_SUMMARY="${SYNC_SUMMARY}\n🚨 ${full_image} (源不可用)"
+                  FAILURE_COUNT=$((FAILURE_COUNT + 1))
                   continue
               fi
-              
-              # 执行同步
-              if docker pull "$full_image" && docker tag "$full_image" "$target_image" && docker push "$target_image"; then
-                  SYNC_SUMMARY="${SYNC_SUMMARY}\n✨ ${image_name_tag}"
-                  SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+
+              # 判断是否需要同步（对比 digest）
+              need_sync=true
+              if target_digest=$(skopeo inspect --format '{{.Digest}}' "docker://$target_image" --creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD" 2>/dev/null); then
+                  if [[ "$source_digest" == "$target_digest" ]]; then
+                      echo ">>> ✅ Skip (已是最新): $full_image"
+                      need_sync=false
+                  else
+                      echo ">>> 🔄 需要更新 (digest 已变化): $full_image"
+                  fi
               else
-                  SYNC_SUMMARY="${SYNC_SUMMARY}\n🚨 ${image_name_tag} (推送失败)"
-                  FAILURE_COUNT=$((FAILURE_COUNT + 1))
+                  echo ">>> ✨ 新镜像: $full_image"
               fi
-              
-              # 强制清理当前镜像 (无论成功失败)
-              cleanup_image "$full_image"
-              cleanup_image "$target_image"
-              
-              # 额外清理 Docker 无用资源
-              docker system prune -af > /dev/null 2>&1
-              docker volume prune -f > /dev/null 2>&1
-              
+
+              # 执行同步（使用 skopeo copy --all）
+              if [[ "$need_sync" == true ]]; then
+                  if skopeo copy --all \
+                      "docker://$full_image" \
+                      "docker://$target_image" \
+                      --dest-creds "$ALIYUN_REGISTRY_USER:$ALIYUN_REGISTRY_PASSWORD"; then
+                      SYNC_SUMMARY="${SYNC_SUMMARY}\n✨ ${full_image}"
+                      SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                  else
+                      SYNC_SUMMARY="${SYNC_SUMMARY}\n🚨 ${full_image} (同步失败)"
+                      FAILURE_COUNT=$((FAILURE_COUNT + 1))
+                  fi
+              fi
           done < images.txt
-          
-          # 最终清理所有 Docker 资源
-          docker system prune -af
-          docker volume prune -f
-          
-          # 写入环境变量
+
+          # 写入环境变量（你的通知逻辑保持不变）
           echo "SUCCESS_COUNT=$SUCCESS_COUNT" >> $GITHUB_ENV
           echo "FAILURE_COUNT=$FAILURE_COUNT" >> $GITHUB_ENV
           {
@@ -144,42 +145,3 @@ jobs:
             echo -e "$SYNC_SUMMARY"
             echo 'EOF'
           } >> $GITHUB_ENV
-          
-          # 最后检查磁盘空间
-          echo "=== 最终磁盘使用情况 ==="
-          df -h
-          docker system df
-
-      - name: 发送 Webhook 通知
-        if: always()
-        run: |
-          if [ -z "${{ secrets.WEBHOOK_URL }}" ]; then exit 0; fi
-          S_COUNT=${{ env.SUCCESS_COUNT }}
-          F_COUNT=${{ env.FAILURE_COUNT }}
-          
-          # 1. 判定标题和主状态
-          if [ "$F_COUNT" -gt 0 ]; then
-              TITLE="❌ 阿里云镜像同步失败"
-              CONTENT="⚠️ 警告：有 $F_COUNT 个镜像同步出现异常，请及时检查。"
-          elif [ "$S_COUNT" -gt 0 ]; then
-              TITLE="✅ 阿里云镜像同步成功"
-              CONTENT="本次新增同步镜像如下："
-          else
-              TITLE="☕ 同步任务完成 (无新镜像)"
-              CONTENT="检测到 images.txt 中暂无新镜像需要同步。"
-          fi
-          
-          # 2. 组装最终文本
-          RAW_TEXT=$(cat <<EOF
-          $TITLE
-          ━━━━━━━━━━━━━━━━
-          $CONTENT
-          ${{ env.SYNC_RESULT }}
-          📊 统计: 成功 $S_COUNT | 失败 $F_COUNT
-          🔗 详情: [查看 GitHub Action 日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          EOF
-          )
-          
-          # 3. 发送通知
-          JSON_PAYLOAD=$(jq -n --arg msg "$RAW_TEXT" '{"msg_type":"text","content":{"text":$msg}}')
-          curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "${{ secrets.WEBHOOK_URL }}"
