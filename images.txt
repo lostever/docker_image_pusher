@@ -76,7 +76,7 @@
 #--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel
 #--platform linux/amd64 pytorch/pytorch:2.9.1-cuda12.6-cudnn9-devel
 --platform linux/amd64 centos:7
-#--platform linux/amd64 ollama/ollama:rocm
+--platform linux/amd64 ollama/ollama:rocm
 --platform linux/amd64 ollama/ollama:latest
 --platform linux/amd64 ghcr.io/open-webui/open-webui:main
 --platform linux/amd64 ghcr.io/home-assistant/home-assistant:stable
@@ -88,8 +88,10 @@
 --platform linux/amd64 alpine/openclaw:latest
 --platform linux/amd64 alpine/openclaw:main
 --platform linux/amd64 zeroclue/comfyui:production-torch2.8.0-cu128
---platform linux/amd64 mistralllm/vllm-ms4:latest
+#--platform linux/amd64 mistralllm/vllm-ms4:latest
 --platform linux/amd64 vllm/vllm-openai:latest-cu130
+--platform linux/amd64 vllm/vllm-openai-rocm:nightly
 --platform linux/amd64 vllm/vllm-omni:v0.18.0
+--platform linux/amd64 vllm/vllm-omni-rocm:v0.18.0
 --platform linux/amd64 vllm/vllm-openai-cpu:latest
 
