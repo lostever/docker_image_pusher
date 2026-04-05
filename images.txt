@@ -94,4 +94,6 @@
 --platform linux/amd64 vllm/vllm-omni:v0.18.0
 --platform linux/amd64 vllm/vllm-omni-rocm:v0.18.0
 --platform linux/amd64 vllm/vllm-openai-cpu:latest
+--platform linux/amd64 metacubex/mihomo:latest
+
 
